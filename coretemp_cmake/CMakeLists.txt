@@ -8,7 +8,7 @@ if(NOT DEFINED INSTALL_EXAMPLESDIR)
     set(INSTALL_EXAMPLESDIR "examples")
 endif()
 
-set(INSTALL_EXAMPLEDIR "${INSTALL_EXAMPLESDIR}/widgets/desktop/systray")
+#set(INSTALL_EXAMPLEDIR "${INSTALL_EXAMPLESDIR}/widgets/desktop/systray")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
@@ -37,18 +37,18 @@ target_link_libraries(systray PRIVATE
 #    "images/trash.png"
 #)
 
-qt_add_resources(systray "systray"
-    PREFIX
-        "/"
-    FILES
-        ${systray_resource_files}
-)
+#qt_add_resources(systray "systray"
+#    PREFIX
+#        "/"
+#    FILES
+#        ${systray_resource_files}
+#)
 
-install(TARGETS systray
-    RUNTIME DESTINATION "${INSTALL_EXAMPLEDIR}"
-    BUNDLE DESTINATION "${INSTALL_EXAMPLEDIR}"
-    LIBRARY DESTINATION "${INSTALL_EXAMPLEDIR}"
-)
+#install(TARGETS systray
+#    RUNTIME DESTINATION "${INSTALL_EXAMPLEDIR}"
+#    BUNDLE DESTINATION "${INSTALL_EXAMPLEDIR}"
+#    LIBRARY DESTINATION "${INSTALL_EXAMPLEDIR}"
+#)
 
 #cmake_minimum_required(VERSION 3.5)
 

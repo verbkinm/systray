@@ -136,10 +136,12 @@ void CoreTemp::createTrayIcon()
 
 QColor CoreTemp::background()
 {
-    if (_temperature >= 0 &&_temperature <= 50)
+    if (_temperature >= 0 &&_temperature <= 40)
         return Qt::green;
-    else if (_temperature <= 80)
+    else if (_temperature > 40 &&_temperature <= 60)
         return Qt::yellow;
+    else if (_temperature > 60 &&_temperature <= 80)
+        return qRgb(255,165,0);
 
     return Qt::red;
 }
