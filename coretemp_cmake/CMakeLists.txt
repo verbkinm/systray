@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 cmake_minimum_required(VERSION 3.16)
-project(systray LANGUAGES CXX)
+project(core_temp LANGUAGES CXX)
 
 if(NOT DEFINED INSTALL_EXAMPLESDIR)
     set(INSTALL_EXAMPLESDIR "examples")
@@ -30,12 +30,12 @@ target_link_libraries(systray PRIVATE
     Qt6::Widgets
 )
 
-# Resources:
-set(systray_resource_files
-    "images/bad.png"
-    "images/heart.png"
-    "images/trash.png"
-)
+## Resources:
+#set(systray_resource_files
+#    "images/bad.png"
+#    "images/heart.png"
+#    "images/trash.png"
+#)
 
 qt_add_resources(systray "systray"
     PREFIX

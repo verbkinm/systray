@@ -16,9 +16,9 @@ int main(int argc, char *argv[])
         return 1;
     }
     QApplication::setQuitOnLastWindowClosed(false);
+    
+    CoreTemp window;
 
-    Window window;
-    window.show();
     return app.exec();
 }
 
