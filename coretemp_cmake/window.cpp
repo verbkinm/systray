@@ -1,5 +1,7 @@
 #include "window.h"
 #include <fstream>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
@@ -47,14 +49,25 @@ void CoreTemp::showMessage()
 
 void CoreTemp::slotTimerOut()
 {
-    std::ifstream file("//sys/devices/platform/coretemp.0/hwmon/hwmon4/temp1_input");
-    if (!file.is_open())
+    size_t len = sizeof(int);
+    int ncpu = 0;
+
+    const char *ncpu_str = "hw.ncpu";
+    sysctlbyname(ncpu_str, &ncpu, &len, NULL, 0);
+
+    int t = 0;
+    _temperature = 0;
+    for (int i = 0; i < ncpu; ++i)
     {
-        return;
+        std::string temp = "dev.cpu." + std::to_string(i) + ".temperature";
+        sysctlbyname(temp.c_str(), &t, &len, NULL, 0);
+
+        t = (t - 2732) / 10;
+        _temperature += t;
     }
 
-    file >> _temperature;
-    _temperature /= 1000;
+    _temperature /= ncpu;
+
     setIcon();
 }
 
