@@ -1,5 +1,10 @@
-#include "window.h"
+#include "coretemp.h"
 #include <fstream>
+
+#ifdef Q_OS_FREEBSD
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
@@ -42,19 +47,45 @@ void CoreTemp::setIcon()
 
 void CoreTemp::showMessage()
 {
-    //    trayIcon->showMessage(titleEdit->text(), bodyEdit->toPlainText(), msgIcon, durationSpinBox->value() * 1000);
+    trayIcon->showMessage("Внимание", "Высокий уровень температуры процессора", QSystemTrayIcon::Warning, 2000);
 }
 
 void CoreTemp::slotTimerOut()
 {
+#ifdef Q_OS_LINUX
     std::ifstream file("//sys/devices/platform/coretemp.0/hwmon/hwmon4/temp1_input");
     if (!file.is_open())
     {
+        _temperature = -240;
         return;
     }
 
     file >> _temperature;
     _temperature /= 1000;
+#endif
+#ifdef Q_OS_FREEBSD
+    size_t len = sizeof(int);
+    int ncpu = 0;
+
+    const char *ncpu_str = "hw.ncpu";
+    sysctlbyname(ncpu_str, &ncpu, &len, NULL, 0);
+
+    int t = 0;
+    _temperature = 0;
+    for (int i = 0; i < ncpu; ++i)
+    {
+        std::string temp = "dev.cpu." + std::to_string(i) + ".temperature";
+        sysctlbyname(temp.c_str(), &t, &len, NULL, 0);
+
+        t = (t - 2731) / 10;
+        _temperature += t;
+    }
+    _temperature /= ncpu;
+#endif
+
+    if (_temperature >= 90)
+        showMessage();
+
     setIcon();
 }
 
@@ -148,7 +179,7 @@ QColor CoreTemp::background()
 
 QString CoreTemp::temperature()
 {
-    if (_temperature < -100 || _temperature > 100)
+    if (_temperature <= -100 || _temperature > 100)
         return "err";
 
     return QString::number(_temperature);
