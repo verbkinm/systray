@@ -3,7 +3,9 @@
 #ifndef QT_NO_SYSTEMTRAYICON
 
 #include <QMessageBox>
-#include "window.h"
+#include <iostream>
+
+#include "coretemp.h"
 
 int main(int argc, char *argv[])
 {
