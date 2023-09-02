@@ -8,28 +8,29 @@
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
-CoreTemp::CoreTemp(QObject *parent) : QObject(parent)
+System_Tray::System_Tray(QObject *parent) : QObject(parent)
 {
     createActions();
-    createTrayIcon();
+    createTrayIcons();
 
     slotTimerOut();
 
-    trayIcon->show();
+    trayIconTemperature->show();
+    trayIconFreeMemory->show();
 
     _timer = new QTimer(this);
     _timer->setInterval(2000);
 
-    connect(_timer, &QTimer::timeout, this, &CoreTemp::slotTimerOut);
+    connect(_timer, &QTimer::timeout, this, &System_Tray::slotTimerOut);
     _timer->start();
 }
 
-CoreTemp::~CoreTemp()
+System_Tray::~System_Tray()
 {
     delete trayIconMenu;
 }
 
-void CoreTemp::setIcon()
+void System_Tray::setIcon()
 {
     QRect rect (0, 0, 22, 22);
     QPixmap pix(rect.size());
@@ -38,19 +39,29 @@ void CoreTemp::setIcon()
     font.setPixelSize(14);
     painter.setFont(font);
 
-    painter.fillRect(rect, background());
+    painter.fillRect(rect, backgroundTemperature());
     painter.drawText(rect, Qt::AlignCenter, temperature());
 
-    trayIcon->setIcon(pix);
-    trayIcon->setToolTip("Температура процессора");
+    trayIconTemperature->setIcon(pix);
+    trayIconTemperature->setToolTip("Температура процессора");
+
+    painter.fillRect(rect, backgroundFreeMem());
+    painter.drawText(rect, Qt::AlignCenter, freeMemory());
+    trayIconFreeMemory->setIcon(pix);
+    trayIconFreeMemory->setToolTip("Свободно ОЗУ %");
 }
 
-void CoreTemp::showMessage()
+void System_Tray::showTemperatureMessage() const
 {
-    trayIcon->showMessage("Внимание", "Высокий уровень температуры процессора", QSystemTrayIcon::Warning, 2000);
+    trayIconTemperature->showMessage("Внимание", "Высокий уровень температуры процессора", QSystemTrayIcon::Warning, 2000);
 }
 
-void CoreTemp::slotTimerOut()
+void System_Tray::showFreeMemMessage() const
+{
+    trayIconFreeMemory->showMessage("Внимание", "Мало свободной ОЗУ", QSystemTrayIcon::Warning, 2000);
+}
+
+void System_Tray::slotTimerOut()
 {
 #ifdef Q_OS_LINUX
     std::ifstream file("//sys/devices/platform/coretemp.0/hwmon/hwmon4/temp1_input");
@@ -81,108 +92,88 @@ void CoreTemp::slotTimerOut()
         _temperature += t;
     }
     _temperature /= ncpu;
+
+    _freeMemPer = 0;
+
+    int page_size;
+    len = sizeof(page_size);
+    sysctlbyname("vm.stats.vm.v_page_size", &page_size, &len, NULL, 0);
+
+    int page_count;
+    len = sizeof(page_count);
+    sysctlbyname("vm.stats.vm.v_page_count", &page_count, &len, NULL, 0);
+
+    size_t total_memory = page_count * page_size;
+
+    int free_count;
+    len = sizeof(free_count);
+    sysctlbyname("vm.stats.vm.v_free_count", &free_count, &len, NULL, 0);
+
+    size_t free_memory = free_count * page_size;
+
+    _freeMemPer = free_memory / (total_memory / 100);
 #endif
 
     if (_temperature >= 90)
-        showMessage();
+        showTemperatureMessage();
+
+//    if (_freeMemPer <= 10)
+//        showFreeMemMessage();
 
     setIcon();
 }
 
-//void Window::createMessageGroupBox()
-//{
-//    messageGroupBox = new QGroupBox(tr("Balloon Message"));
-
-//    typeLabel = new QLabel(tr("Type:"));
-
-//    typeComboBox = new QComboBox;
-//    typeComboBox->addItem(tr("None"), QSystemTrayIcon::NoIcon);
-//    typeComboBox->addItem(style()->standardIcon(
-//                              QStyle::SP_MessageBoxInformation), tr("Information"),
-//                          QSystemTrayIcon::Information);
-//    typeComboBox->addItem(style()->standardIcon(
-//                              QStyle::SP_MessageBoxWarning), tr("Warning"),
-//                          QSystemTrayIcon::Warning);
-//    typeComboBox->addItem(style()->standardIcon(
-//                              QStyle::SP_MessageBoxCritical), tr("Critical"),
-//                          QSystemTrayIcon::Critical);
-//    typeComboBox->addItem(QIcon(), tr("Custom icon"),
-//                          -1);
-//    typeComboBox->setCurrentIndex(1);
-
-//    durationLabel = new QLabel(tr("Duration:"));
-
-//    durationSpinBox = new QSpinBox;
-//    durationSpinBox->setRange(5, 60);
-//    durationSpinBox->setSuffix(" s");
-//    durationSpinBox->setValue(15);
-
-//    durationWarningLabel = new QLabel(tr("(some systems might ignore this "
-//                                         "hint)"));
-//    durationWarningLabel->setIndent(10);
-
-//    titleLabel = new QLabel(tr("Title:"));
-
-//    titleEdit = new QLineEdit(tr("Cannot connect to network"));
-
-//    bodyLabel = new QLabel(tr("Body:"));
-
-//    bodyEdit = new QTextEdit;
-//    bodyEdit->setPlainText(tr("Don't believe me. Honestly, I don't have a "
-//                              "clue.\nClick this balloon for details."));
-
-//    showMessageButton = new QPushButton(tr("Show Message"));
-//    showMessageButton->setDefault(true);
-
-//    QGridLayout *messageLayout = new QGridLayout;
-//    messageLayout->addWidget(typeLabel, 0, 0);
-//    messageLayout->addWidget(typeComboBox, 0, 1, 1, 2);
-//    messageLayout->addWidget(durationLabel, 1, 0);
-//    messageLayout->addWidget(durationSpinBox, 1, 1);
-//    messageLayout->addWidget(durationWarningLabel, 1, 2, 1, 3);
-//    messageLayout->addWidget(titleLabel, 2, 0);
-//    messageLayout->addWidget(titleEdit, 2, 1, 1, 4);
-//    messageLayout->addWidget(bodyLabel, 3, 0);
-//    messageLayout->addWidget(bodyEdit, 3, 1, 2, 4);
-//    messageLayout->addWidget(showMessageButton, 5, 4);
-//    messageLayout->setColumnStretch(3, 1);
-//    messageLayout->setRowStretch(4, 1);
-//    messageGroupBox->setLayout(messageLayout);
-//}
-
-void CoreTemp::createActions()
+void System_Tray::createActions()
 {
     quitAction = new QAction("Выход", this);
     connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
 }
 
-void CoreTemp::createTrayIcon()
+void System_Tray::createTrayIcons()
 {
     trayIconMenu = new QMenu;
     trayIconMenu->addAction(quitAction);
 
-    trayIcon = new QSystemTrayIcon(this);
-    trayIcon->setContextMenu(trayIconMenu);
+    trayIconTemperature = new QSystemTrayIcon(this);
+    trayIconTemperature->setContextMenu(trayIconMenu);
+
+    trayIconFreeMemory = new QSystemTrayIcon(this);
+    trayIconFreeMemory->setContextMenu(trayIconMenu);
 }
 
-QColor CoreTemp::background()
+QColor System_Tray::backgroundTemperature() const
 {
-    if (_temperature >= 0 &&_temperature <= 40)
+    if (_temperature >= 0 && _temperature <= 40)
         return Qt::green;
-    else if (_temperature > 40 &&_temperature <= 60)
+    if (_temperature <= 60)
         return Qt::yellow;
-    else if (_temperature > 60 &&_temperature <= 80)
+    if (_temperature <= 80)
         return qRgb(255,165,0);
 
     return Qt::red;
 }
 
-QString CoreTemp::temperature()
+QColor System_Tray::backgroundFreeMem() const
+{
+    if (_freeMemPer >= 60)
+        return Qt::green;
+    if (_freeMemPer >= 80)
+        return Qt::yellow;
+
+    return Qt::red;
+}
+
+QString System_Tray::temperature() const
 {
     if (_temperature <= -100 || _temperature > 100)
         return "err";
 
     return QString::number(_temperature);
+}
+
+QString System_Tray::freeMemory() const
+{
+    return QString::number(_freeMemPer);
 }
 
 #endif

@@ -3,7 +3,6 @@
 #ifndef QT_NO_SYSTEMTRAYICON
 
 #include <QMessageBox>
-#include <iostream>
 
 #include "coretemp.h"
 
@@ -19,7 +18,7 @@ int main(int argc, char *argv[])
     }
     QApplication::setQuitOnLastWindowClosed(false);
     
-    CoreTemp window;
+    System_Tray tray;
 
     return app.exec();
 }

@@ -1,5 +1,5 @@
-#ifndef WINDOW_H
-#define WINDOW_H
+#ifndef SYSTEMTRAY_H
+#define SYSTEMTRAY_H
 
 #include <QSystemTrayIcon>
 #include <QAction>
@@ -7,40 +7,42 @@
 #include <QMenu>
 #include <QPainter>
 #include <QTimer>
-//#include <QProcess>
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
-class CoreTemp : public QObject
+class System_Tray : public QObject
 {
     Q_OBJECT
 
 public:
-    CoreTemp(QObject *parent = nullptr);
-    ~CoreTemp();
+    System_Tray(QObject *parent = nullptr);
+    ~System_Tray();
 
 private:
     void createActions();
-    void createTrayIcon();
-    QColor background();
-    QString temperature();
+    void createTrayIcons();
+    QColor backgroundTemperature() const;
+    QColor backgroundFreeMem() const;
+    QString temperature() const;
+    QString freeMemory() const;
 
     QAction *quitAction;
 
-    QSystemTrayIcon *trayIcon;
+    QSystemTrayIcon *trayIconTemperature, *trayIconFreeMemory;
     QMenu *trayIconMenu;
 
     QTimer *_timer;
 
-    int _temperature;
+    int _temperature, _freeMemPer;
 
 public slots:
     void setIcon();
-    void showMessage();
+    void showTemperatureMessage() const;
+    void showFreeMemMessage() const;
 
     void slotTimerOut();
 };
 
 #endif // QT_NO_SYSTEMTRAYICON
 
-#endif
+#endif // SYSTEMTRAY
