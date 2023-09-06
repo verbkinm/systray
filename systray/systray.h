@@ -28,10 +28,12 @@ private:
 
     uint64_t totalMemory() const;
 
-    QAction *quitAction;
+    QAction *quitAction,
+            *propertyTemperature, *propertyMemory,
+            *showMessageTemperature, *showMessageMemory;
 
     QSystemTrayIcon *trayIconTemperature, *trayIconFreeMemory;
-    QMenu *trayIconMenu;
+    QMenu *trayIconTemperatureMenu, *trayIconMemoryMenu;
 
     QTimer *_timer;
 

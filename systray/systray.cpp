@@ -27,7 +27,8 @@ System_Tray::System_Tray(QObject *parent) : QObject(parent)
 
 System_Tray::~System_Tray()
 {
-    delete trayIconMenu;
+    delete trayIconTemperatureMenu;
+    delete trayIconMemoryMenu;
 }
 
 void System_Tray::setIcon()
@@ -115,11 +116,11 @@ void System_Tray::slotTimerOut()
     _freeMemPer = free_memory / (total_memory / 100);
 #endif
 
-    if (_temperature >= 90)
+    if (_temperature >= 90 && showMessageTemperature->isChecked())
         showTemperatureMessage();
 
-//    if (_freeMemPer <= 10)
-//        showFreeMemMessage();
+    if (_freeMemPer <= 10 && showMessageMemory->isChecked())
+        showFreeMemMessage();
 
     setIcon();
 }
@@ -128,18 +129,38 @@ void System_Tray::createActions()
 {
     quitAction = new QAction("Выход", this);
     connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
+
+    propertyTemperature = new QAction("Настройки", this);
+    propertyMemory = new QAction("Настройки", this);
+
+    showMessageTemperature = new QAction("Отображать сообщения", this);
+    showMessageTemperature->setCheckable(true);
+    showMessageTemperature->setChecked(true);
+
+    showMessageMemory = new QAction("Отображать сообщения", this);;
+    showMessageMemory->setCheckable(true);
+    showMessageMemory->setChecked(true);
 }
 
 void System_Tray::createTrayIcons()
 {
-    trayIconMenu = new QMenu;
-    trayIconMenu->addAction(quitAction);
+    trayIconTemperatureMenu = new QMenu;
+    trayIconTemperatureMenu->addAction(showMessageTemperature);
+    trayIconTemperatureMenu->addAction(propertyTemperature);
+    trayIconTemperatureMenu->addSeparator();
+    trayIconTemperatureMenu->addAction(quitAction);
 
     trayIconTemperature = new QSystemTrayIcon(this);
-    trayIconTemperature->setContextMenu(trayIconMenu);
+    trayIconTemperature->setContextMenu(trayIconTemperatureMenu);
+
+    trayIconMemoryMenu = new QMenu;
+    trayIconMemoryMenu->addAction(showMessageMemory);
+    trayIconMemoryMenu->addAction(propertyMemory);
+    trayIconMemoryMenu->addSeparator();
+    trayIconMemoryMenu->addAction(quitAction);
 
     trayIconFreeMemory = new QSystemTrayIcon(this);
-    trayIconFreeMemory->setContextMenu(trayIconMenu);
+    trayIconFreeMemory->setContextMenu(trayIconMemoryMenu);
 }
 
 QColor System_Tray::backgroundTemperature() const
