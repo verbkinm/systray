@@ -48,7 +48,8 @@ void System_Tray::setIcon()
     painter.fillRect(rect, backgroundFreeMem());
     painter.drawText(rect, Qt::AlignCenter, freeMemory());
     trayIconFreeMemory->setIcon(pix);
-    trayIconFreeMemory->setToolTip("Свободно ОЗУ %");
+    trayIconFreeMemory->setToolTip(QString("Всего ОЗУ: %1 МБ.\n"
+                                           "Свободно: %2 %").arg(totalMemory() / 1024 / 1024).arg(_freeMemPer));
 }
 
 void System_Tray::showTemperatureMessage() const
@@ -176,6 +177,23 @@ QString System_Tray::temperature() const
 QString System_Tray::freeMemory() const
 {
     return QString::number(_freeMemPer);
+}
+
+uint64_t System_Tray::totalMemory() const
+{
+#ifdef Q_OS_FREEBSD
+    int page_size;
+    size_t len = sizeof(page_size);
+    sysctlbyname("vm.stats.vm.v_page_size", &page_size, &len, NULL, 0);
+
+    int page_count;
+    len = sizeof(page_count);
+    sysctlbyname("vm.stats.vm.v_page_count", &page_count, &len, NULL, 0);
+
+    return page_size * page_count;
+#endif
+
+    return 0;
 }
 
 #endif

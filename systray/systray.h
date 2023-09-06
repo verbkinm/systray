@@ -26,6 +26,8 @@ private:
     QString temperature() const;
     QString freeMemory() const;
 
+    uint64_t totalMemory() const;
+
     QAction *quitAction;
 
     QSystemTrayIcon *trayIconTemperature, *trayIconFreeMemory;
