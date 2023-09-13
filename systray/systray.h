@@ -21,23 +21,24 @@ public:
 private:
     void createActions();
     void createTrayIcons();
-    QColor backgroundTemperature() const;
-    QColor backgroundFreeMem() const;
-    QString temperature() const;
-    QString freeMemory() const;
 
-    uint64_t totalMemory() const;
+    QColor backgroundTemperature() const;
+    QColor backgroundActiveMem() const;
+
+    QString temperature() const;
+    float toPer(size_t val) const;
 
     QAction *quitAction,
             *propertyTemperature, *propertyMemory,
             *showMessageTemperature, *showMessageMemory;
 
-    QSystemTrayIcon *trayIconTemperature, *trayIconFreeMemory;
+    QSystemTrayIcon *trayIconTemperature, *trayIconMemory;
     QMenu *trayIconTemperatureMenu, *trayIconMemoryMenu;
 
     QTimer *_timer;
 
-    int _temperature, _freeMemPer;
+    int _temperature, _pageSize, _pageCount;
+    size_t _totalMem, _activeMem, _inactiveMem, _laundryMem, _wiredMem, _freeMem;
 
 public slots:
     void setIcon();

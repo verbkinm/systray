@@ -1,5 +1,6 @@
 #include "systray.h"
 #include <fstream>
+#include <sstream>
 
 #ifdef Q_OS_FREEBSD
 #include <sys/types.h>
@@ -10,13 +11,31 @@
 
 System_Tray::System_Tray(QObject *parent) : QObject(parent)
 {
+    _freeMem = 0;
+    _activeMem = 0;
+    _inactiveMem = 0;
+    _laundryMem = 0;
+    _wiredMem = 0;
+
+    // Значение не изменяются у следующих полей
+
+    size_t len = sizeof(_pageSize);
+    sysctlbyname("vm.stats.vm.v_page_size", &_pageSize, &len, NULL, 0);
+
+    len = sizeof(_pageCount);
+    sysctlbyname("vm.stats.vm.v_page_count", &_pageCount, &len, NULL, 0);
+
+    _totalMem = _pageSize * _pageCount;
+
+    //
+
     createActions();
     createTrayIcons();
 
     slotTimerOut();
 
     trayIconTemperature->show();
-    trayIconFreeMemory->show();
+    trayIconMemory->show();
 
     _timer = new QTimer(this);
     _timer->setInterval(2000);
@@ -44,13 +63,23 @@ void System_Tray::setIcon()
     painter.drawText(rect, Qt::AlignCenter, temperature());
 
     trayIconTemperature->setIcon(pix);
-    trayIconTemperature->setToolTip("Температура процессора");
+    trayIconTemperature->setToolTip("Температура процессора (C°)");
 
-    painter.fillRect(rect, backgroundFreeMem());
-    painter.drawText(rect, Qt::AlignCenter, freeMemory());
-    trayIconFreeMemory->setIcon(pix);
-    trayIconFreeMemory->setToolTip(QString("Всего ОЗУ: %1 МБ.\n"
-                                           "Свободно: %2 %").arg(totalMemory() / 1024 / 1024).arg(_freeMemPer));
+    painter.fillRect(rect, backgroundActiveMem());
+    painter.drawText(rect, Qt::AlignCenter, QString::number(_activeMem / (_totalMem / 100)));
+    trayIconMemory->setIcon(pix);
+
+    std::stringstream stream;
+    stream << "Оперативная память (Использовано %)\n\n"
+           << "Детали:\n"
+           << "total: " << (_totalMem / 1024 / 1024) << " МБ (" << toPer(_totalMem) << "%)\n"
+           << "active: " << (_activeMem / 1024 / 1024) << " МБ (" << toPer(_activeMem) << "%)\n"
+           << "inactive: " << (_inactiveMem / 1024 / 1024) << " МБ (" << toPer(_inactiveMem) << "%)\n"
+           << "laundry: " << (_laundryMem / 1024 / 1024) << " МБ (" << toPer(_laundryMem) << "%)\n"
+           << "wired: " << (_wiredMem / 1024 / 1024) << " МБ (" << toPer(_wiredMem) << "%)\n"
+           << "free: " << (_freeMem / 1024 / 1024) << " МБ (" << toPer(_freeMem) << "%)";
+
+    trayIconMemory->setToolTip(stream.str().c_str());
 }
 
 void System_Tray::showTemperatureMessage() const
@@ -60,7 +89,7 @@ void System_Tray::showTemperatureMessage() const
 
 void System_Tray::showFreeMemMessage() const
 {
-    trayIconFreeMemory->showMessage("Внимание", "Мало свободной ОЗУ", QSystemTrayIcon::Warning, 2000);
+    trayIconMemory->showMessage("Внимание", "Мало свободной ОЗУ", QSystemTrayIcon::Warning, 2000);
 }
 
 void System_Tray::slotTimerOut()
@@ -95,31 +124,41 @@ void System_Tray::slotTimerOut()
     }
     _temperature /= ncpu;
 
-    _freeMemPer = 0;
-
-    int page_size;
-    len = sizeof(page_size);
-    sysctlbyname("vm.stats.vm.v_page_size", &page_size, &len, NULL, 0);
+    _freeMem = 0;
+    _activeMem = 0;
+    _inactiveMem = 0;
+    _laundryMem = 0;
+    _wiredMem = 0;
 
     int page_count;
     len = sizeof(page_count);
     sysctlbyname("vm.stats.vm.v_page_count", &page_count, &len, NULL, 0);
 
-    size_t total_memory = page_count * page_size;
-
     int free_count;
     len = sizeof(free_count);
     sysctlbyname("vm.stats.vm.v_free_count", &free_count, &len, NULL, 0);
 
-    size_t free_memory = free_count * page_size;
+    _freeMem = free_count * _pageSize;
 
-    _freeMemPer = free_memory / (total_memory / 100);
+    len = sizeof(_activeMem);
+    sysctlbyname("vm.stats.vm.v_active_count", &_activeMem, &len, NULL, 0);
+    _activeMem = _activeMem * _pageSize;
+
+    sysctlbyname("vm.stats.vm.v_inactive_count", &_inactiveMem, &len, NULL, 0);
+    _inactiveMem = _inactiveMem * _pageSize;
+
+    sysctlbyname("vm.stats.vm.v_laundry_count", &_laundryMem, &len, NULL, 0);
+    _laundryMem = _laundryMem * _pageSize;
+
+    sysctlbyname("vm.stats.vm.v_wire_count", &_wiredMem, &len, NULL, 0);
+    _wiredMem = _wiredMem * _pageSize;
+
 #endif
 
     if (_temperature >= 90 && showMessageTemperature->isChecked())
         showTemperatureMessage();
 
-    if (_freeMemPer <= 10 && showMessageMemory->isChecked())
+    if ((_activeMem / (_totalMem / 100)) >= 90 && showMessageMemory->isChecked())
         showFreeMemMessage();
 
     setIcon();
@@ -159,8 +198,8 @@ void System_Tray::createTrayIcons()
     trayIconMemoryMenu->addSeparator();
     trayIconMemoryMenu->addAction(quitAction);
 
-    trayIconFreeMemory = new QSystemTrayIcon(this);
-    trayIconFreeMemory->setContextMenu(trayIconMemoryMenu);
+    trayIconMemory = new QSystemTrayIcon(this);
+    trayIconMemory->setContextMenu(trayIconMemoryMenu);
 }
 
 QColor System_Tray::backgroundTemperature() const
@@ -175,13 +214,14 @@ QColor System_Tray::backgroundTemperature() const
     return Qt::red;
 }
 
-QColor System_Tray::backgroundFreeMem() const
+QColor System_Tray::backgroundActiveMem() const
 {
-    if (_freeMemPer >= 60)
+    int actMemPer = _activeMem / (_totalMem / 100);
+    if (actMemPer <= 30)
         return Qt::green;
-    if (_freeMemPer >= 40)
+    if (actMemPer <= 50)
         return Qt::yellow;
-    if (_freeMemPer >= 20)
+    if (actMemPer <= 90)
         return qRgb(255, 165, 0);
 
     return Qt::red;
@@ -195,26 +235,9 @@ QString System_Tray::temperature() const
     return QString::number(_temperature);
 }
 
-QString System_Tray::freeMemory() const
+float System_Tray::toPer(size_t val) const
 {
-    return QString::number(_freeMemPer);
-}
-
-uint64_t System_Tray::totalMemory() const
-{
-#ifdef Q_OS_FREEBSD
-    int page_size;
-    size_t len = sizeof(page_size);
-    sysctlbyname("vm.stats.vm.v_page_size", &page_size, &len, NULL, 0);
-
-    int page_count;
-    len = sizeof(page_count);
-    sysctlbyname("vm.stats.vm.v_page_count", &page_count, &len, NULL, 0);
-
-    return page_size * page_count;
-#endif
-
-    return 0;
+    return val / (_totalMem / 100.0);
 }
 
 #endif
