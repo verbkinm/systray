@@ -37,7 +37,8 @@ private:
 
     QTimer *_timer;
 
-    int _temperature, _pageSize, _pageCount;
+    int _temperature, _pageSize, _pageCount, _ncpu;
+    std::vector<int> _tempeCores;
     size_t _totalMem, _activeMem, _inactiveMem, _laundryMem, _wiredMem, _freeMem;
 
 public slots:

@@ -27,6 +27,12 @@ System_Tray::System_Tray(QObject *parent) : QObject(parent)
 
     _totalMem = _pageSize * _pageCount;
 
+    len = sizeof(_ncpu);
+    sysctlbyname("hw.ncpu", &_ncpu, &len, NULL, 0);
+
+    _tempeCores.resize(_ncpu);
+    _tempeCores.shrink_to_fit();
+
     //
 
     createActions();
@@ -63,13 +69,21 @@ void System_Tray::setIcon()
     painter.drawText(rect, Qt::AlignCenter, temperature());
 
     trayIconTemperature->setIcon(pix);
-    trayIconTemperature->setToolTip("Температура процессора (C°)");
+
+    std::stringstream stream;
+    stream << "Температура процессора (C°)\n\n";
+
+    for (int i = 0; i < _ncpu - 1; ++i)
+        stream << "Ядро " << i << ": " << _tempeCores.at(i) << "\n";
+    stream << "Ядро " << _ncpu - 1 << ": " << _tempeCores.back();
+
+    trayIconTemperature->setToolTip(stream.str().c_str());
 
     painter.fillRect(rect, backgroundActiveMem());
     painter.drawText(rect, Qt::AlignCenter, QString::number(int(_activeMem / (_totalMem / 100.0) + 0.5)));
     trayIconMemory->setIcon(pix);
 
-    std::stringstream stream;
+    stream.str({});
     stream << "Оперативная память (Использовано %)\n\n"
            << "Детали:\n"
            << "total: " << (_totalMem / 1024 / 1024) << " МБ (" << toPer(_totalMem) << "%)\n"
@@ -106,23 +120,21 @@ void System_Tray::slotTimerOut()
     _temperature /= 1000;
 #endif
 #ifdef Q_OS_FREEBSD
-    size_t len = sizeof(int);
-    int ncpu = 0;
 
-    const char *ncpu_str = "hw.ncpu";
-    sysctlbyname(ncpu_str, &ncpu, &len, NULL, 0);
 
     int t = 0;
+    size_t len = sizeof(t);
     _temperature = 0;
-    for (int i = 0; i < ncpu; ++i)
+    for (int i = 0; i < _ncpu; ++i)
     {
         std::string temp = "dev.cpu." + std::to_string(i) + ".temperature";
         sysctlbyname(temp.c_str(), &t, &len, NULL, 0);
 
         t = (t - 2731) / 10;
+        _tempeCores.at(i) = t;
         _temperature += t;
     }
-    _temperature /= ncpu;
+    _temperature /= _ncpu;
 
     _freeMem = 0;
     _activeMem = 0;
