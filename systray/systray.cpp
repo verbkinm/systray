@@ -66,7 +66,7 @@ void System_Tray::setIcon()
     trayIconTemperature->setToolTip("Температура процессора (C°)");
 
     painter.fillRect(rect, backgroundActiveMem());
-    painter.drawText(rect, Qt::AlignCenter, QString::number(_activeMem / (_totalMem / 100)));
+    painter.drawText(rect, Qt::AlignCenter, QString::number(int(_activeMem / (_totalMem / 100.0) + 0.5)));
     trayIconMemory->setIcon(pix);
 
     std::stringstream stream;

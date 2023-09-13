@@ -15,7 +15,7 @@ class System_Tray : public QObject
     Q_OBJECT
 
 public:
-    System_Tray(QObject *parent = nullptr);
+    explicit System_Tray(QObject *parent = nullptr);
     ~System_Tray();
 
 private:
