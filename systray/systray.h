@@ -23,21 +23,22 @@ private:
     void createTrayIcons();
 
     QColor backgroundTemperature() const;
+    QColor backgroundGPUTemperature() const;
     QColor backgroundActiveMem() const;
 
-    QString temperature() const;
+    QString temperature(int t) const;
     float toPer(size_t val) const;
 
-    QAction *quitAction,
-            *propertyTemperature, *propertyMemory,
-            *showMessageTemperature, *showMessageMemory;
+    QAction *_quitAction,
+            *_propertyTemperature, *_propertyMemory, *_propertyGPUTemperature,
+            *_showMessageTemperature, *_showMessageGPUTemperature, *_showMessageMemory;
 
-    QSystemTrayIcon *trayIconTemperature, *trayIconMemory;
-    QMenu *trayIconTemperatureMenu, *trayIconMemoryMenu;
+    QSystemTrayIcon *_trayIconTemperature, *_trayIconMemory, *_trayIconGPUTemperature;
+    QMenu *_trayIconTemperatureMenu, *_trayIconMemoryMenu, *_trayIconGPUTemperatureMenu;
 
     QTimer *_timer;
 
-    int _temperature, _pageSize, _pageCount, _ncpu;
+    int _temperature, _pageSize, _pageCount, _ncpu, _temperatureGPU;
     std::vector<int> _tempeCores;
     size_t _totalMem, _activeMem, _inactiveMem, _laundryMem, _wiredMem, _freeMem;
 

@@ -1,21 +1,25 @@
 #include "systray.h"
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 #ifdef Q_OS_FREEBSD
+#include <QProcess>
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#define NVIDIA_SMI "/usr/local/bin/nvidia-smi"
 #endif
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
-System_Tray::System_Tray(QObject *parent) : QObject(parent)
+System_Tray::System_Tray(QObject *parent) : QObject(parent), _trayIconGPUTemperatureMenu(nullptr)
 {
     _freeMem = 0;
     _activeMem = 0;
     _inactiveMem = 0;
     _laundryMem = 0;
     _wiredMem = 0;
+    _temperatureGPU = 0;
 
     // Значение не изменяются у следующих полей
 
@@ -40,8 +44,11 @@ System_Tray::System_Tray(QObject *parent) : QObject(parent)
 
     slotTimerOut();
 
-    trayIconTemperature->show();
-    trayIconMemory->show();
+    _trayIconTemperature->show();
+    _trayIconMemory->show();
+
+    if (_trayIconGPUTemperature != nullptr)
+        _trayIconGPUTemperature->show();
 
     _timer = new QTimer(this);
     _timer->setInterval(2000);
@@ -52,8 +59,11 @@ System_Tray::System_Tray(QObject *parent) : QObject(parent)
 
 System_Tray::~System_Tray()
 {
-    delete trayIconTemperatureMenu;
-    delete trayIconMemoryMenu;
+    delete _trayIconTemperatureMenu;
+    delete _trayIconMemoryMenu;
+
+    if (_trayIconGPUTemperatureMenu != nullptr)
+        delete _trayIconGPUTemperatureMenu;
 }
 
 void System_Tray::setIcon()
@@ -65,10 +75,12 @@ void System_Tray::setIcon()
     font.setPixelSize(14);
     painter.setFont(font);
 
-    painter.fillRect(rect, backgroundTemperature());
-    painter.drawText(rect, Qt::AlignCenter, temperature());
+    // Температура
 
-    trayIconTemperature->setIcon(pix);
+    painter.fillRect(rect, backgroundTemperature());
+    painter.drawText(rect, Qt::AlignCenter, temperature(_temperature));
+
+    _trayIconTemperature->setIcon(pix);
 
     std::stringstream stream;
     stream << "Температура процессора (C°)\n\n";
@@ -77,11 +89,13 @@ void System_Tray::setIcon()
         stream << "Ядро " << i << ": " << _tempeCores.at(i) << "\n";
     stream << "Ядро " << _ncpu - 1 << ": " << _tempeCores.back();
 
-    trayIconTemperature->setToolTip(stream.str().c_str());
+    _trayIconTemperature->setToolTip(stream.str().c_str());
+
+    // ОЗУ
 
     painter.fillRect(rect, backgroundActiveMem());
     painter.drawText(rect, Qt::AlignCenter, QString::number(int(_activeMem / (_totalMem / 100.0) + 0.5)));
-    trayIconMemory->setIcon(pix);
+    _trayIconMemory->setIcon(pix);
 
     stream.str({});
     stream << "Оперативная память (Использовано %)\n\n"
@@ -93,17 +107,30 @@ void System_Tray::setIcon()
            << "wired: " << (_wiredMem / 1024 / 1024) << " МБ (" << toPer(_wiredMem) << "%)\n"
            << "free: " << (_freeMem / 1024 / 1024) << " МБ (" << toPer(_freeMem) << "%)";
 
-    trayIconMemory->setToolTip(stream.str().c_str());
+    _trayIconMemory->setToolTip(stream.str().c_str());
+
+    // GPU температура
+    painter.fillRect(rect, backgroundGPUTemperature());
+    painter.drawText(rect, Qt::AlignCenter, temperature(_temperatureGPU));
+
+    _trayIconGPUTemperature->setIcon(pix);
+
+    stream.str({});
+    stream << "Температура GPU (C°)\n\n";
+
+    stream << _temperatureGPU;
+
+    _trayIconGPUTemperature->setToolTip(stream.str().c_str());
 }
 
 void System_Tray::showTemperatureMessage() const
 {
-    trayIconTemperature->showMessage("Внимание", "Высокий уровень температуры процессора", QSystemTrayIcon::Warning, 2000);
+    _trayIconTemperature->showMessage("Внимание", "Высокий уровень температуры процессора", QSystemTrayIcon::Warning, 2000);
 }
 
 void System_Tray::showFreeMemMessage() const
 {
-    trayIconMemory->showMessage("Внимание", "Мало свободной ОЗУ", QSystemTrayIcon::Warning, 2000);
+    _trayIconTemperature->showMessage("Внимание", "Мало свободной ОЗУ", QSystemTrayIcon::Warning, 2000);
 }
 
 void System_Tray::slotTimerOut()
@@ -120,8 +147,6 @@ void System_Tray::slotTimerOut()
     _temperature /= 1000;
 #endif
 #ifdef Q_OS_FREEBSD
-
-
     int t = 0;
     size_t len = sizeof(t);
     _temperature = 0;
@@ -165,12 +190,33 @@ void System_Tray::slotTimerOut()
     sysctlbyname("vm.stats.vm.v_wire_count", &_wiredMem, &len, NULL, 0);
     _wiredMem = _wiredMem * _pageSize;
 
+    if (FILE *file = fopen(NVIDIA_SMI, "r"))
+    {
+        fclose(file);
+        QProcess nv_smi;
+        nv_smi.start(NVIDIA_SMI, QStringList() << "-q" << "-d" << "TEMPERATURE");
+        nv_smi.waitForFinished();
+        QStringList list = QString(nv_smi.readAll()).split("\n");
+
+        for(const auto &el : list)
+        {
+            if (el.contains("GPU Current Temp"))
+            {
+                auto index = el.indexOf(":");
+                bool ok;
+                int t = el.mid(index + 1).remove(" ").remove("C").toInt(&ok);
+                if (ok)
+                    _temperatureGPU = t;
+            }
+        }
+    }
+
 #endif
 
-    if (_temperature >= 90 && showMessageTemperature->isChecked())
+    if (_temperature >= 90 && _showMessageTemperature->isChecked())
         showTemperatureMessage();
 
-    if ((_activeMem / (_totalMem / 100)) >= 90 && showMessageMemory->isChecked())
+    if ((_activeMem / (_totalMem / 100)) >= 90 && _showMessageTemperature->isChecked())
         showFreeMemMessage();
 
     setIcon();
@@ -178,40 +224,60 @@ void System_Tray::slotTimerOut()
 
 void System_Tray::createActions()
 {
-    quitAction = new QAction("Выход", this);
-    connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
+    _quitAction = new QAction("Выход", this);
+    connect(_quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
 
-    propertyTemperature = new QAction("Настройки", this);
-    propertyMemory = new QAction("Настройки", this);
+    _propertyTemperature = new QAction("Настройки", this);
+    _propertyMemory = new QAction("Настройки", this);
+    _propertyGPUTemperature = new QAction("Настройки", this);
 
-    showMessageTemperature = new QAction("Отображать сообщения", this);
-    showMessageTemperature->setCheckable(true);
-    showMessageTemperature->setChecked(true);
+    _showMessageTemperature = new QAction("Отображать сообщения", this);
+    _showMessageTemperature->setCheckable(true);
+    _showMessageTemperature->setChecked(true);
 
-    showMessageMemory = new QAction("Отображать сообщения", this);;
-    showMessageMemory->setCheckable(true);
-    showMessageMemory->setChecked(true);
+    _showMessageMemory = new QAction("Отображать сообщения", this);
+    _showMessageMemory->setCheckable(true);
+    _showMessageMemory->setChecked(true);
+
+    if (FILE *file = fopen(NVIDIA_SMI, "r"))
+    {
+        _showMessageGPUTemperature = new QAction("Отображать сообщения", this);
+        _showMessageGPUTemperature->setCheckable(true);
+        _showMessageGPUTemperature->setChecked(true);
+    }
 }
 
 void System_Tray::createTrayIcons()
 {
-    trayIconTemperatureMenu = new QMenu;
-    trayIconTemperatureMenu->addAction(showMessageTemperature);
-    trayIconTemperatureMenu->addAction(propertyTemperature);
-    trayIconTemperatureMenu->addSeparator();
-    trayIconTemperatureMenu->addAction(quitAction);
+    _trayIconTemperatureMenu = new QMenu;
+    _trayIconTemperatureMenu->addAction(_showMessageTemperature);
+    _trayIconTemperatureMenu->addAction(_propertyTemperature);
+    _trayIconTemperatureMenu->addSeparator();
+    _trayIconTemperatureMenu->addAction(_quitAction);
 
-    trayIconTemperature = new QSystemTrayIcon(this);
-    trayIconTemperature->setContextMenu(trayIconTemperatureMenu);
+    _trayIconTemperature = new QSystemTrayIcon(this);
+    _trayIconTemperature->setContextMenu(_trayIconTemperatureMenu);
 
-    trayIconMemoryMenu = new QMenu;
-    trayIconMemoryMenu->addAction(showMessageMemory);
-    trayIconMemoryMenu->addAction(propertyMemory);
-    trayIconMemoryMenu->addSeparator();
-    trayIconMemoryMenu->addAction(quitAction);
+    _trayIconMemoryMenu = new QMenu;
+    _trayIconMemoryMenu->addAction(_showMessageMemory);
+    _trayIconMemoryMenu->addAction(_propertyMemory);
+    _trayIconMemoryMenu->addSeparator();
+    _trayIconMemoryMenu->addAction(_quitAction);
 
-    trayIconMemory = new QSystemTrayIcon(this);
-    trayIconMemory->setContextMenu(trayIconMemoryMenu);
+    _trayIconMemory = new QSystemTrayIcon(this);
+    _trayIconMemory->setContextMenu(_trayIconMemoryMenu);
+
+    if (FILE *file = fopen(NVIDIA_SMI, "r"))
+    {
+        _trayIconGPUTemperatureMenu = new QMenu;
+        _trayIconGPUTemperatureMenu->addAction(_showMessageGPUTemperature);
+        _trayIconGPUTemperatureMenu->addAction(_propertyGPUTemperature);
+        _trayIconGPUTemperatureMenu->addSeparator();
+        _trayIconGPUTemperatureMenu->addAction(_quitAction);
+
+        _trayIconGPUTemperature = new QSystemTrayIcon(this);
+        _trayIconGPUTemperature->setContextMenu(_trayIconGPUTemperatureMenu);;
+    }
 }
 
 QColor System_Tray::backgroundTemperature() const
@@ -221,6 +287,18 @@ QColor System_Tray::backgroundTemperature() const
     if (_temperature <= 60)
         return Qt::yellow;
     if (_temperature <= 80)
+        return qRgb(255, 165, 0);
+
+    return Qt::red;
+}
+
+QColor System_Tray::backgroundGPUTemperature() const
+{
+    if (_temperatureGPU >= 0 && _temperatureGPU <= 40)
+        return Qt::green;
+    if (_temperatureGPU <= 60)
+        return Qt::yellow;
+    if (_temperatureGPU <= 80)
         return qRgb(255, 165, 0);
 
     return Qt::red;
@@ -239,12 +317,12 @@ QColor System_Tray::backgroundActiveMem() const
     return Qt::red;
 }
 
-QString System_Tray::temperature() const
+QString System_Tray::temperature(int t) const
 {
-    if (_temperature <= -100 || _temperature > 100)
+    if (t <= -100 || t > 100)
         return "err";
 
-    return QString::number(_temperature);
+    return QString::number(t);
 }
 
 float System_Tray::toPer(size_t val) const
