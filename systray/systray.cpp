@@ -110,17 +110,20 @@ void System_Tray::setIcon()
     _trayIconMemory->setToolTip(stream.str().c_str());
 
     // GPU температура
-    painter.fillRect(rect, backgroundGPUTemperature());
-    painter.drawText(rect, Qt::AlignCenter, temperature(_temperatureGPU));
+    if (_trayIconGPUTemperature != nullptr)
+    {
+        painter.fillRect(rect, backgroundGPUTemperature());
+        painter.drawText(rect, Qt::AlignCenter, temperature(_temperatureGPU));
 
-    _trayIconGPUTemperature->setIcon(pix);
+        _trayIconGPUTemperature->setIcon(pix);
 
-    stream.str({});
-    stream << "Температура GPU (C°)\n\n";
+        stream.str({});
+        stream << "Температура GPU (C°)\n\n";
 
-    stream << _temperatureGPU;
+        stream << _temperatureGPU;
 
-    _trayIconGPUTemperature->setToolTip(stream.str().c_str());
+        _trayIconGPUTemperature->setToolTip(stream.str().c_str());
+    }
 }
 
 void System_Tray::showTemperatureMessage() const
